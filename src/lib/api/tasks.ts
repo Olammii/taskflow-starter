@@ -1,7 +1,7 @@
-import type { SupabaseClient } from '@supabase/supabase-js';
+import type { SupabaseClient } from "@supabase/supabase-js";
 
-import type { CreateTaskInput } from '@/lib/validation/task';
-import type { Database, Task, TaskStatus } from '@/types/database';
+import type { CreateTaskInput } from "@/lib/validation/task";
+import type { Database, Task, TaskStatus } from "@/types/database";
 
 /* ===========================================================================
  * TODO 1 — the data layer for tasks
@@ -42,7 +42,15 @@ export async function fetchTasks(
 ): Promise<Task[]> {
   void supabase;
   void projectId;
-  throw new Error('TODO 1: implement fetchTasks');
+  const { data, error } = await supabase
+    .from("tasks")
+    .select("*")
+    .eq("project_id", projectId)
+    .order("created_at", { ascending: true });
+
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("No data returned from fetchtasks");
+  return data;
 }
 
 /**
@@ -64,7 +72,21 @@ export async function createTask(
   void projectId;
   void userId;
   void input;
-  throw new Error('TODO 1: implement createTask');
+  const { data, error } = await supabase
+    .from("tasks")
+    .insert({
+      project_id: projectId,
+      title: input.title,
+      created_by: userId,
+      description: input.description || null,
+      status: input.status,
+      priority: input.priority
+    })
+    .select()
+    .single();
+  if (error) throw new Error(error.message);
+
+  return data;
 }
 
 /**
@@ -80,7 +102,16 @@ export async function updateTaskStatus(
   void supabase;
   void taskId;
   void status;
-  throw new Error('TODO 1: implement updateTaskStatus');
+  const { data, error } = await supabase
+    .from("tasks")
+    .update({ status })
+    .eq("id", taskId)
+    .select()
+    .single();
+
+  if (error) throw new Error(error.message);
+
+  return data;
 }
 
 /**
@@ -94,5 +125,8 @@ export async function deleteTask(
 ): Promise<void> {
   void supabase;
   void taskId;
-  throw new Error('TODO 1: implement deleteTask');
+
+  const { error } = await supabase.from("tasks").delete().eq("id", taskId);
+
+  if (error) throw new Error(error.message);
 }

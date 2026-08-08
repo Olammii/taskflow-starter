@@ -1,8 +1,11 @@
-'use client';
+"use client";
 
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import type { Task, TaskStatus } from '@/types/database';
+import type { Task, TaskStatus } from "@/types/database";
+import { taskKeys } from "@/lib/query-keys";
+import { createClient } from "@/lib/supabase/client";
+import { updateTaskStatus } from "@/lib/api/tasks";
 
 /* ===========================================================================
  * TODO 7 — move a task between columns. OPTIMISTIC UPDATE.
@@ -69,9 +72,32 @@ import type { Task, TaskStatus } from '@/types/database';
  * =========================================================================== */
 
 export function useUpdateTaskStatus(projectId: string) {
-  return useMutation<Task, Error, { id: string; status: TaskStatus }>({
-    mutationFn: async () => {
-      throw new Error(`TODO 7: implement useUpdateTaskStatus (project ${projectId})`);
+  const supabase = createClient();
+  const queryClient = useQueryClient();
+  const queryKey = taskKeys.list(projectId);
+
+  return useMutation({
+    mutationFn: ({ id, status }: { id: string; status: TaskStatus }) =>
+      updateTaskStatus(supabase, id, status),
+    onMutate: async ({ id, status }) => {
+      await queryClient.cancelQueries({ queryKey });
+
+      const previous = queryClient.getQueryData<Task[]>(queryKey);
+
+      queryClient.setQueryData<Task[]>(queryKey, (old) =>
+        old?.map((task) => (task.id === id ? { ...task, status } : task)),
+      );
+
+      return { previous };
+    },
+
+    onError: (_error, _variables, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(queryKey, context.previous);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey });
     },
   });
 }
